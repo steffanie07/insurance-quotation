@@ -3,13 +3,20 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
+use App\Models\Quotation;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Tymon\JWTAuth\Facades\JWTAuth;
+
+
 
 class QuotationController extends Controller
 {
     public function calculateQuotation(Request $request)
     {
-    
-        // Validate the request data
+        try {
         $validatedData = $request->validate([
             'age' => 'required',
             'currency_id' => 'required|in:EUR,GBP,USD',
@@ -33,15 +40,28 @@ class QuotationController extends Controller
             $total += $fixedRate * $ageLoad * $tripLength;
         }
 
-        $response = [
-            'total' => number_format($total, 2),
-            'currency_id' => $currencyId,
-            'quotation_id' => $quotationId = time() . mt_rand(100, 999),
-            
-        ];
+        $quotation = Quotation::create([
+            'total' => $total,
+            'currency_id' => $request->currency_id,
+        ]);
 
-       return response()->json($response);
+        $quotation = Quotation::create([
+            'total' => $total,
+            'currency_id' => $request->currency_id,
+        ]);
+        
+        return response()->json([
+            'Quotation Id' => $quotation->id,
+            'total' => $quotation->total,
+            'Currency Id' => $quotation->currency_id,
+        ], 201);
+
+    } catch (ValidationException $e) {
+        return response()->json(['errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
     }
+}
 
     private function getAgeLoad($age)
     {
@@ -68,5 +88,31 @@ class QuotationController extends Controller
         $start = \Carbon\Carbon::createFromFormat('Y-m-d', $startDate);
         $end = \Carbon\Carbon::createFromFormat('Y-m-d', $endDate);
         return $start->diffInDays($end) + 1; // Add 1 to include both start and end dates
+    }
+
+  
+
+    public function register(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'name' => 'required|max:55',
+                'email' => 'email|required|unique:users',
+                'password' => 'required|confirmed'
+            ]);
+    
+            $validatedData['password'] = bcrypt($request->password);
+    
+            $user = User::create($validatedData);
+            
+            $accessToken = JWTAuth::fromUser($user);
+
+           
+            return response()->json(['user' => $user, 'access_token' => $accessToken]);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'User registration failed.'], 500);
+        }
     }
 }

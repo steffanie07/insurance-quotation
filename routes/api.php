@@ -20,4 +20,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::post('quotation', [QuotationController::class,'calculateQuotation'])->name('api.quotation.calculate');
+
+
+Route::group(['middleware' => 'jwt'], function() {
+    Route::post('quotation', [QuotationController::class,'calculateQuotation'])->name('api.quotation.calculate');
+});
+
+Route::post('/register', [QuotationController::class, 'register'])->name('api.register');
